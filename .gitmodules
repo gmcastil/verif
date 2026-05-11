@@ -1,3 +1,6 @@
 [submodule "extern/svunit"]
 	path = extern/svunit
 	url = https://github.com/svunit/svunit
+[submodule "extern/uvm"]
+	path = extern/uvm
+	url = https://github.com/nitronis/UVM
