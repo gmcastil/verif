@@ -3,13 +3,13 @@
 ## Project
 
 VRF is a lightweight SystemVerilog verification framework inspired by UVM. It targets
-Questa (standard license) and preserves UVM's core architecture — component hierarchy,
-phases, sequences, analysis ports — while cutting factory, coverage, RAL, and the
+Questa (standard license) and preserves UVM's core architecture  -  component hierarchy,
+phases, sequences, analysis ports  -  while cutting factory, coverage, RAL, and the
 `uvm_config_db` string-path mechanism. Uses the abstract BFM pattern (Rich & Bromley,
 DVCon 2008) in place of virtual interfaces.
 
 - **Design document:** `docs/framework_design.md`
-- **Development log:** `docs/devlog.md` — start here each session for open decisions
+- **Development log:** `docs/devlog.md`  -  start here each session for open decisions
 
 ## Who Is In Charge
 
@@ -41,4 +41,18 @@ I am the architect. You are the assistant. You operate in two standing capacitie
 2. **Tests second** - we write tests that define the expected behavior of each interface
 3. **Implementation last** - only once tests exist do we write code to make them pass
 4. **One thing at a time** - we complete one pipeline stage before moving to the next
+
+## Context Loading
+
+At the start of every session, read the following files before doing anything else:
+
+1. `docs/devlog.md` - recent decisions and open questions
+2. `docs/framework_design.md` - full architectural design
+
+Report any open decisions before proceeding.
+
+## Coding and Documentation Standards
+
+- ASCII only. Do not use non-ASCII characters, unicode, or emoji in any
+  SystemVerilog source, comments, or documentation files.
 

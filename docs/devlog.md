@@ -2,7 +2,29 @@
 
 ---
 
-## Session 1 — 2026-05-10
+## Session 2  -  2026-05-11
+
+### What Was Decided
+
+- **SVUnit** added as a shallow submodule at `extern/svunit`, pinned to `v3.38.1`.
+  This is the test runner for VRF unit tests.
+- **UVM 1800.2-2020** added as a shallow submodule at `extern/uvm`. Read-only
+  reference for resolving design decisions  -  not compiled or run.
+- Both fetched via `git submodule update --init`. Neither is loaded at session
+  start.
+- CLAUDE.md updated with context loading protocol and ASCII-only rule.
+
+### Open Design Decisions
+
+The six decisions from Session 1 remain open. No progress made this session.
+
+### Next Steps
+
+(same as Session 1)
+
+---
+
+## Session 1  -  2026-05-10
 
 ### What Was Decided
 
@@ -11,9 +33,9 @@ captured in detail in `docs/framework_design.md`. Summary:
 
 - **Language / tooling:** SystemVerilog, Questa standard license
 - **Prefix:** `vrf_` for all framework base classes
-- **No factory** — explicit instantiation only
-- **No coverage** — out of scope entirely
-- **Abstract BFM pattern** — concrete BFM lives in the interface alongside signals and
+- **No factory**  -  explicit instantiation only
+- **No coverage**  -  out of scope entirely
+- **Abstract BFM pattern**  -  concrete BFM lives in the interface alongside signals and
   a clocking block; drivers/monitors hold an abstract class handle; no virtual interfaces
 - **4 phases:** build, connect, run, report
 - **Objection mechanism** for run-phase termination
@@ -21,13 +43,13 @@ captured in detail in `docs/framework_design.md`. Summary:
 - **Analysis ports + subscribers:** observer pattern; monitors broadcast, scoreboard and
   logger subscribe
 - **Active and passive agents** both supported
-- **`vrf_config_db #(T)`:** static, typed, keyed by short name string — no hierarchical
+- **`vrf_config_db #(T)`:** static, typed, keyed by short name string  -  no hierarchical
   path matching
 - **`vrf_logger`:** singleton, severity levels + per-component verbosity threshold,
   console and/or file output
 - **Config objects** as single source of truth: testbench and DUT init sequence both
   read the same config object
-- **Layer boundary:** framework → protocol agent → DUT-specific; no upward dependencies
+- **Layer boundary:** framework -> protocol agent -> DUT-specific; no upward dependencies
 
 ---
 
@@ -45,7 +67,7 @@ Decision affects: `vrf_component` constructor, `vrf_phase_manager` interface.
 
 **2. Component naming and path**
 How are component names assigned and does a component know its full hierarchical path?
-- Constructor argument (parent + local name → derived path)?
+- Constructor argument (parent + local name -> derived path)?
 - Or flat name only?
 
 Decision affects: `vrf_component` constructor, logger output format, config_db name
@@ -74,8 +96,8 @@ Decision affects: `vrf_sequencer` and `vrf_driver` interfaces.
 
 **6. Scoreboard base class interface**
 What does `vrf_scoreboard` actually provide beyond being a subscriber? Options:
-- Just a base class with `write()` — user implements all checking logic
-- A predict/compare pattern — scoreboard has a `predict(item)` and `check(item)` split
+- Just a base class with `write()`  -  user implements all checking logic
+- A predict/compare pattern  -  scoreboard has a `predict(item)` and `check(item)` split
 - Something else
 
 Decision affects: `vrf_scoreboard` interface and how tests wire up checking.
