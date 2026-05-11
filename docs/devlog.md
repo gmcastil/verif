@@ -2,6 +2,56 @@
 
 ---
 
+## Session 3  -  2026-05-11
+
+### What Was Decided
+
+- **Decision #1 resolved: phase propagation via tree walk from a known root.**
+  `vrf_phase_manager` holds a reference to `vrf_root` and walks the component tree
+  top-down (build, connect) or bottom-up (report). Execution order is a structural
+  property of the hierarchy, not dependent on construction order.
+
+- **`vrf_root` singleton introduced.**
+  Mirrors UVM's hidden `uvm_top`. The test object is a child of `vrf_root`, not a
+  parentless root itself. The bootstrap entry point creates `vrf_root`, instantiates
+  the test as its child, and passes `vrf_root` to the phase manager.
+
+- **Decision #2 resolved: hierarchical naming path.**
+  Components know their full hierarchical path, derived from parent name + local name
+  at construction. Details TBD when `vrf_component` interface is defined.
+
+- **Decision #6 resolved: vrf_scoreboard provides pass/fail infrastructure.**
+  `vrf_scoreboard` extends `vrf_subscriber`. `write(T item)` is pure virtual --
+  the user implements all checking and comparison logic. The base class provides
+  `pass()` and `fail()` methods that increment counters and log at INFO/ERROR
+  respectively, and a default `report_phase()` that prints a standardized
+  pass/fail summary. Expected value computation is always user responsibility.
+
+- **Decision #5 resolved: item_done() carries no response argument.**
+  The driver populates status and response fields directly on the transaction item
+  before calling item_done(). The sequence checks those fields after finish_item()
+  returns. No separate response channel or second sequencer queue needed.
+
+- **Decision #3 resolved: virtual sequences follow the UVM pattern.**
+  A virtual sequence extends `vrf_sequence` and holds handles to real sequencers.
+  It runs on a null sequencer -- a `vrf_sequencer` instantiated with no driver
+  attached. No new framework machinery required beyond `vrf_sequence::start()`
+  accepting a sequencer handle and sequences being startable from within `body()`.
+
+- **Decision #4 partially resolved: simulation bootstrap.**
+  The entry point creates `vrf_root`, instantiates the named test class as a child of
+  it, and calls `vrf_phase_manager::run(vrf_root)`. Full interface TBD.
+
+### Open Design Decisions
+
+None. All six decisions resolved this session.
+
+### Next Steps
+
+(same as Session 1, minus decisions #1, #2, and #4)
+
+---
+
 ## Session 2  -  2026-05-11
 
 ### What Was Decided
