@@ -1,0 +1,3 @@
+[submodule "extern/svunit"]
+	path = extern/svunit
+	url = https://github.com/svunit/svunit
