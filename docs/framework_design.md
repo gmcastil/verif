@@ -3,8 +3,8 @@
 ## Overview
 
 VRF is a lightweight, SystemVerilog verification framework inspired by UVM. It preserves
-the architectural value of UVM  -  component hierarchy, phasing, stimulus sequences,
-transaction-level monitoring  -  while deliberately omitting the complexity that makes UVM
+the architectural value of UVM - component hierarchy, phasing, stimulus sequences,
+transaction-level monitoring - while deliberately omitting the complexity that makes UVM
 difficult to understand, maintain, and extend.
 
 The framework is designed around a UART DUT as the initial verification target, with
@@ -14,11 +14,11 @@ planned support for AXI, Avalon, and eventually HDMI interfaces.
 
 ## Design Philosophy
 
-- **Design first**  -  interfaces and data structures are agreed before any code is written
-- **Tests second**  -  tests define expected behavior before implementation
-- **Implementation last**  -  code is written to make tests pass
-- **Explicit over implicit**  -  no runtime string-path lookups, no hidden wiring
-- **Simple over general**  -  complexity is only added when a concrete use case demands it
+- **Design first** - interfaces and data structures are agreed before any code is written
+- **Tests second** - tests define expected behavior before implementation
+- **Implementation last** - code is written to make tests pass
+- **Explicit over implicit** - no runtime string-path lookups, no hidden wiring
+- **Simple over general** - complexity is only added when a concrete use case demands it
 
 ---
 
@@ -26,14 +26,14 @@ planned support for AXI, Avalon, and eventually HDMI interfaces.
 
 The following UVM features are intentionally excluded:
 
-| Feature | Reason |
-|---------|--------|
-| Factory / type overrides | Runtime type substitution adds complexity with limited practical benefit |
-| Functional coverage | Not needed for this use case |
-| Formal verification | Outside Questa standard license |
-| Assertion-based verification | Outside Questa standard license |
-| `uvm_config_db` string-path matching | Replaced by a typed, name-keyed registry |
-| 12-phase UVM phase schedule | Replaced by four phases: build, connect, run, report |
+| Feature                              | Reason                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------ |
+| Factory / type overrides             | Runtime type substitution adds complexity with limited practical benefit |
+| Functional coverage                  | Not needed for this use case                                             |
+| Formal verification                  | Outside Questa standard license                                          |
+| Assertion-based verification         | Outside Questa standard license                                          |
+| `uvm_config_db` string-path matching | Replaced by a typed, name-keyed registry                                 |
+| 12-phase UVM phase schedule          | Replaced by four phases: build, connect, run, report                     |
 
 ---
 
@@ -67,13 +67,13 @@ vrf_root                 - hidden singleton; root of the component tree; parent 
       vrf_scoreboard     - subscribes to monitors; checks correctness
 ```
 
-`vrf_root` mirrors UVM's hidden `uvm_top`. It is never instantiated by user code  -  the
+`vrf_root` mirrors UVM's hidden `uvm_top`. It is never instantiated by user code - the
 bootstrap creates it, instantiates the test as its child, and passes it to
 `vrf_phase_manager`. This ensures the test has a parent and phase traversal has a
 single known root.
 
-Sequences and sequence items are **not** components  -  they have no phases and do not
-live in the component tree. They run *on* components (sequencers).
+Sequences and sequence items are **not** components - they have no phases and do not
+live in the component tree. They run _on_ components (sequencers).
 
 ```
 vrf_sequence_item        - base transaction class
@@ -86,12 +86,12 @@ vrf_sequence #(T)        - defines stimulus in body() task; started on a sequenc
 
 Four phases execute in order across the entire component tree before the next phase begins:
 
-| Phase | Purpose | Order |
-|-------|---------|-------|
-| `build` | Instantiate child components | top-down |
-| `connect` | Wire analysis ports to subscribers | top-down |
-| `run` | Execute stimulus (blocking; ends via objection mechanism) | top-down |
-| `report` | Print results and summaries | bottom-up |
+| Phase     | Purpose                                                   | Order     |
+| --------- | --------------------------------------------------------- | --------- |
+| `build`   | Instantiate child components                              | top-down  |
+| `connect` | Wire analysis ports to subscribers                        | top-down  |
+| `run`     | Execute stimulus (blocking; ends via objection mechanism) | top-down  |
+| `report`  | Print results and summaries                               | bottom-up |
 
 `vrf_phase_manager` drives phase execution by walking the component tree from `vrf_root`.
 It recursively visits each component, calling the phase method on a parent before
@@ -122,13 +122,13 @@ base class.
 ## Abstract BFM Pattern
 
 Drivers and monitors never reference signals directly. Instead they operate through an
-abstract BFM class. This follows the pattern described in *"Abstract BFMs Outshine Virtual
-Interfaces for Advanced SystemVerilog Testbenches"* (Rich & Bromley, DVCon 2008).
+abstract BFM class. This follows the pattern described in _"Abstract BFMs Outshine Virtual
+Interfaces for Advanced SystemVerilog Testbenches"_ (Rich & Bromley, DVCon 2008).
 
 **Structure:**
 
 - An abstract base class (e.g., `uart_bfm`) is declared in a package. It contains only
-  `pure virtual` tasks defining the protocol API  -  no signal references.
+  `pure virtual` tasks defining the protocol API - no signal references.
 - The `interface` declares the bus signals, a `default clocking` block for timing
   abstraction, and a concrete class extending the abstract BFM. The concrete class
   implements the API using signals directly in scope.
@@ -153,10 +153,10 @@ anywhere in the class-based testbench.
 
 `vrf_agent` supports two modes controlled by a flag in the agent's config object:
 
-| Mode | Contents | Use case |
-|------|----------|---------|
-| Active | sequencer + driver + monitor | Driving stimulus onto a bus the testbench controls |
-| Passive | monitor only | Observing a bus driven by the DUT or another agent |
+| Mode    | Contents                     | Use case                                           |
+| ------- | ---------------------------- | -------------------------------------------------- |
+| Active  | sequencer + driver + monitor | Driving stimulus onto a bus the testbench controls |
+| Passive | monitor only                 | Observing a bus driven by the DUT or another agent |
 
 A single testbench may contain both modes simultaneously (e.g., active agent driving the
 UART RX pin; passive agent monitoring the UART TX pin).
@@ -169,10 +169,10 @@ Stimulus is generated by sequence objects that run on a sequencer:
 
 1. A sequence's `body()` task creates a transaction item, populates its outbound fields,
    and calls `start_item()` / `finish_item()` on the sequencer
-2. The driver calls `get_next_item(item)`  -  blocks until a transaction is available
+2. The driver calls `get_next_item(item)` - blocks until a transaction is available
 3. The driver passes the transaction to the BFM to drive on the bus
 4. The driver populates any response or status fields on the same transaction item
-5. The driver calls `item_done()`  -  signals completion back to the sequence
+5. The driver calls `item_done()` - signals completion back to the sequence
 6. The sequence resumes after `finish_item()` and may inspect response fields on the item
 
 `item_done()` takes no response argument. The driver and sequence share a handle to the
@@ -193,7 +193,7 @@ sequence handles the coordination. A virtual sequence extends `vrf_sequence` and
 handles to multiple real sequencers. Its `body()` starts sub-sequences on those
 sequencers directly, using fork/join as needed.
 
-A virtual sequence runs on a null sequencer  -  a `vrf_sequencer` instantiated with no
+A virtual sequence runs on a null sequencer - a `vrf_sequencer` instantiated with no
 driver attached. The null sequencer is a placeholder to satisfy the type system; the
 virtual sequence never actually uses it for item handshake.
 
@@ -229,7 +229,7 @@ key convention for `vrf_config_db` lookups.
 
 `vrf_test_registry` is a static name-to-constructor map. Each test class registers
 itself by name using a static initializer or macro in its include file. There are no
-type overrides  -  the registry maps names to constructors only.
+type overrides - the registry maps names to constructors only.
 
 A `+config` plusarg selects the active configuration object by name using the same
 include-file self-registration pattern.
@@ -243,18 +243,21 @@ pattern. Monitors do not know who is listening; subscribers do not know which mo
 fed them.
 
 **`vrf_analysis_port #(T)`**
+
 - Owned by a monitor
 - Holds a list of registered subscribers
 - `write(T item)` iterates the list and calls `write()` on each subscriber
 
 **`vrf_subscriber #(T)`**
+
 - Abstract base class with one pure virtual method: `write(T item)`
 - Implemented by: `vrf_scoreboard`, logger adapters, and any other consumer
 - Subscribers register with an analysis port during `connect` phase
 
 **`vrf_scoreboard`**
+
 - Extends `vrf_subscriber`
-- `write(T item)` is pure virtual  -  the user implements all checking and comparison
+- `write(T item)` is pure virtual - the user implements all checking and comparison
   logic; expected value computation is always protocol-specific and lives in the
   concrete subclass
 - Provides `pass()` and `fail()` methods that increment internal counters and log at
@@ -282,6 +285,7 @@ scope resolution, and no silent failures from path mismatches. A `get()` call ei
 finds the name or returns a fatal error.
 
 Primary contents:
+
 - Abstract BFM handles (registered by interfaces, retrieved by drivers/monitors)
 - Agent config objects (registered by the test, retrieved by agents)
 
