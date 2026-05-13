@@ -15,13 +15,26 @@
 - **`vrf_config_db` interface finalized.**
   Three-argument interface: `set(cntxt, field_name, value)` and
   `get(cntxt, field_name, value)`. `cntxt` is a component handle; the database
-  derives the path via `get_full_name()` internally. No `inst_name` argument,
-  no parent-walk lookup, no wildcard matching. Composite key is
-  `(type, path, field_name)`. Null context writes to a flat global namespace.
-  `set` overwrites on collision and logs a WARNING. `get` logs a WARNING on miss
-  and returns 0; caller decides fatality. BFM handles are passed directly through
-  constructors from `tb.sv` and do not go through `vrf_config_db`.
+  derives the path via `get_full_name()` internally. No `inst_name` argument, no
+  wildcards. Parent walk retained: `get` walks the ancestry chain on miss; most
+  specific entry wins. This enables reusable components (e.g. Avalon BFM) to
+  always look up the same field name regardless of how many instances exist.
+  Null context writes to a flat global namespace. `set` overwrites on collision
+  and logs a WARNING. `get` logs a WARNING on miss and returns 0; caller decides
+  fatality. BFM handles are passed via constructors from `tb.sv`, not config_db.
   Full spec in `docs/vrf_config_db.md`.
+
+- **`vrf_logger` design direction established (spec TBD, next session).**
+  Two orthogonal controls: severity threshold (DEBUG/INFO/WARNING/ERROR/FATAL)
+  and a per-component enable flag (binary on/off). Both driven by plusargs at
+  simulation startup - no recompilation needed. Logger owns a verbosity table
+  mapping name strings to levels; components pass their full hierarchical name
+  string, not a handle. No circular dependency with `vrf_component`. Parent walk
+  applies to verbosity lookup - if a component has no specific entry, walk up the
+  name path to find an ancestor entry or fall back to global default. Enable flag
+  allows silencing everything except one targeted component, solving the
+  grep-chain problem encountered in practice. Usable from non-component code
+  (sequences, sequence items) via any identifying name string.
 
 - **Documentation structure established.**
   One markdown file per framework component under `docs/`. Files use `##` as the
