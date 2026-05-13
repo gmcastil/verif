@@ -2,6 +2,48 @@
 
 ---
 
+## Session 4  -  2026-05-12
+
+### What Was Decided
+
+- **Five phases, not four.** A `config` phase is inserted between `build` and
+  `connect`. Phase order is: build -> config -> connect -> run -> report.
+  `build` strictly constructs the component hierarchy. `config` is where each
+  component retrieves its configuration from `vrf_config_db`. This separation
+  guarantees all entries are registered before any component calls `get`.
+
+- **`vrf_config_db` interface finalized.**
+  Three-argument interface: `set(cntxt, field_name, value)` and
+  `get(cntxt, field_name, value)`. `cntxt` is a component handle; the database
+  derives the path via `get_full_name()` internally. No `inst_name` argument,
+  no parent-walk lookup, no wildcard matching. Composite key is
+  `(type, path, field_name)`. Null context writes to a flat global namespace.
+  `set` overwrites on collision and logs a WARNING. `get` logs a WARNING on miss
+  and returns 0; caller decides fatality. BFM handles are passed directly through
+  constructors from `tb.sv` and do not go through `vrf_config_db`.
+  Full spec in `docs/vrf_config_db.md`.
+
+- **Documentation structure established.**
+  One markdown file per framework component under `docs/`. Files use `##` as the
+  top-level header. `make docs` assembles them into a single combined document.
+  `docs/preamble.md` carries the `#` title. `docs/framework_design.md` will
+  eventually be decomposed into per-component files as specs mature.
+
+### Open Design Decisions
+
+None from this session.
+
+### Next Steps
+
+1. Define `vrf_component` base class interface
+2. Define `vrf_sequence_item` base class
+3. Define `vrf_logger` interface (prerequisite for `vrf_component`)
+4. Define `vrf_objection` interface (prerequisite for `vrf_component`)
+5. Add `make docs` target to Makefile
+6. Write tests for `vrf_config_db`
+
+---
+
 ## Session 3  -  2026-05-11
 
 ### What Was Decided
