@@ -1,2 +1,5 @@
+# NFS lock files
+.nfs*
+# Stuff left behind by the LSP
 *md_ltex.json
 

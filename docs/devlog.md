@@ -2,6 +2,78 @@
 
 ---
 
+## Session 5  -  2026-05-13
+
+### What Was Decided
+
+- **`vrf_logger` design finalized (interface TBD, next step this session).**
+  Two orthogonal axes: severity (`INFO/WARNING/ERROR/FATAL`) and verbosity
+  (`LOG_NONE/LOG_LOW/LOG_HIGH/LOG_TRACE`). The binary enable flag from Session 4
+  is replaced by the verbosity axis with four levels. `ERROR` and `FATAL` are
+  immune to verbosity suppression. A compiled-in global default applies when no
+  other entry matches.
+
+- **Verbosity table lives in the logger, not on components.**
+  The logger owns two associative arrays keyed by hierarchical name strings.
+  Components pass their full name string on every log call; the logger does the
+  lookup. No per-component report handler object. No circular dependency with
+  `vrf_component`. Usable from sequences and other non-component code.
+
+- **Two-table override model.**
+  - User table: populated by components during `config` phase by calling
+    `vrf_logger::set_verbosity(name, level)`. Agents set their own entry using
+    the verbosity field from their config object.
+  - Override table: populated at time zero by parsing plusargs. Never modified
+    after that. Lookup checks override table first, then user table, with parent
+    walk applied to both. Override table always wins.
+
+- **Plusarg format.**
+  `+vrf_verbosity=LOG_LOW` sets the global default. `+vrf_set_verbosity=<path>:<level>`
+  sets a per-component override; repeatable for multiple entries.
+
+- **Parent walk on name strings.**
+  Verbosity lookup strips the trailing `.component` segment iteratively until a
+  match is found or the string is exhausted. Same parent-walk idea as
+  `vrf_config_db`. The empty string signals exhaustion; fall back to global
+  default.
+
+- **Config object pattern clarified.**
+  Config objects are plain SV classes, not structs (reference semantics needed
+  for config_db). Test creates env config with top-level settings. Env creates
+  agent configs from the env config during `config` phase and registers them in
+  `vrf_config_db` under agent names. Agents retrieve their own config and call
+  `vrf_logger::set_verbosity` using the verbosity field on the config object.
+
+- **`vrf_logger` interface spec written.** Full spec at `docs/vrf_logger.md`.
+  Enums: `vrf_severity_e` (`LOG_INFO/LOG_WARN/LOG_ERROR/LOG_FATAL`) and
+  `vrf_verbosity_e` (`LOG_NONE/LOG_LOW/LOG_HIGH/LOG_DEBUG`). Public interface:
+  `log(name, severity, verbosity, msg, filename, line_number)` and
+  `set_verbosity(name, level)`. Output format matches UVM: full hierarchical path,
+  file/line on every message, raw `$time`. `is_enabled()` pre-check dropped as
+  premature optimization. Log file via `+vrf_log_file=<path>` plusarg.
+
+- **`+config` mechanism noted as unspecified.**
+  The `+config` plusarg (mentioned in `framework_design.md`) is intended to
+  separate configuration data from test behavior but has not been fully
+  designed. Flagged for a future design session.
+
+### Open Design Decisions
+
+None from this session.
+
+### Next Steps
+
+1. Write SVUnit tests for `vrf_logger`
+2. Implement `vrf_logger`
+3. Define `vrf_component` base class interface
+4. Define `vrf_sequence_item` base class
+5. Define `vrf_objection` interface
+6. Add `make docs` target to Makefile
+7. Write tests for `vrf_config_db`
+8. Design `+config` mechanism (future session)
+
+---
+
 ## Session 4  -  2026-05-12
 
 ### What Was Decided
