@@ -33,7 +33,7 @@ The following UVM features are intentionally excluded:
 | Formal verification                  | Outside Questa standard license                                          |
 | Assertion-based verification         | Outside Questa standard license                                          |
 | `uvm_config_db` string-path matching | Replaced by a typed, name-keyed registry                                 |
-| 12-phase UVM phase schedule          | Replaced by four phases: build, connect, run, report                     |
+| 12-phase UVM phase schedule          | Replaced by five phases: build, config, connect, run, report             |
 
 ---
 
@@ -84,11 +84,12 @@ vrf_sequence #(T)        - defines stimulus in body() task; started on a sequenc
 
 ## Phase Mechanism
 
-Four phases execute in order across the entire component tree before the next phase begins:
+Five phases execute in order across the entire component tree before the next phase begins:
 
 | Phase     | Purpose                                                   | Order     |
 | --------- | --------------------------------------------------------- | --------- |
 | `build`   | Instantiate child components                              | top-down  |
+| `config`  | Retrieve configuration from `vrf_config_db`               | top-down  |
 | `connect` | Wire analysis ports to subscribers                        | top-down  |
 | `run`     | Execute stimulus (blocking; ends via objection mechanism) | top-down  |
 | `report`  | Print results and summaries                               | bottom-up |
@@ -138,8 +139,10 @@ Interfaces for Advanced SystemVerilog Testbenches"_ (Rich & Bromley, DVCon 2008)
 
 **Handle delivery:**
 
-The concrete BFM handle is registered in `vrf_config_db` by the interface's `initial`
-block at time zero. The driver and monitor retrieve it by type and name during `build`.
+The concrete BFM handle is passed into the driver and monitor via their constructors.
+`tb.sv` creates the concrete BFM instance (or retrieves it from the interface) and
+supplies it at elaboration time. This avoids any dependency on `vrf_config_db` for
+handle delivery.
 
 **Clocking blocks:**
 
@@ -225,7 +228,7 @@ key convention for `vrf_config_db` lookups.
 2. The entry point creates `vrf_root`
 3. `vrf_test_registry::create(name, vrf_root)` constructs the named test as a child
    of `vrf_root`
-4. `vrf_phase_manager` walks the tree from `vrf_root` and drives all four phases
+4. `vrf_phase_manager` walks the tree from `vrf_root` and drives all five phases
 
 `vrf_test_registry` is a static name-to-constructor map. Each test class registers
 itself by name using a static initializer or macro in its include file. There are no
@@ -272,22 +275,25 @@ fed them.
 ### `vrf_config_db #(T)`
 
 A static, parameterized class that acts as a typed object registry. Each type
-specialization has independent storage. Objects are stored and retrieved by a short name
-string (not a hierarchical path).
+specialization has independent storage. Objects are stored and retrieved using a
+component handle and a short field name string. The composite key is
+`(type, path, field_name)` where path is derived internally from
+`cntxt.get_full_name()`.
 
 ```
-vrf_config_db #(uart_bfm)::set("uart0", bfm_handle);   // interface initial block
-vrf_config_db #(uart_bfm)::get("uart0", bfm_handle);   // driver build phase
+vrf_config_db #(uart_agent_config)::set(m_uart_agent, "cfg", uart_cfg);   // test build phase
+vrf_config_db #(uart_agent_config)::get(this,         "cfg", m_cfg);      // agent config phase
 ```
 
-This replaces UVM's `uvm_config_db`. There are no wildcard path matches, no runtime
-scope resolution, and no silent failures from path mismatches. A `get()` call either
-finds the name or returns a fatal error.
+This replaces UVM's `uvm_config_db`. There are no wildcard path matches and no runtime
+scope resolution. On a miss, `get()` logs a WARNING and returns 0; the caller decides
+whether to treat the miss as fatal. `set()` during `build` phase registers entries;
+`get()` during `config` phase retrieves them, guaranteeing all entries exist before any
+lookup occurs. A null context writes to a flat global namespace accessible to any caller.
 
 Primary contents:
 
-- Abstract BFM handles (registered by interfaces, retrieved by drivers/monitors)
-- Agent config objects (registered by the test, retrieved by agents)
+- Agent config objects (registered by the test during `build`, retrieved by agents during `config`)
 
 ### Config Objects
 
@@ -295,8 +301,8 @@ Each agent type has a typed config object (e.g., `uart_agent_config`) that carri
 parameters needed to configure that agent: protocol settings (baud rate, data width,
 etc.) and testbench settings (active vs. passive).
 
-The test creates config objects, populates them, and stores them in `vrf_config_db`.
-Agents retrieve them during `build`.
+The test creates config objects, populates them, and stores them in `vrf_config_db`
+during `build` phase. Agents retrieve them during `config` phase.
 
 ### DUT Initialization
 
@@ -311,17 +317,23 @@ package, not the framework.
 ## Logger
 
 `vrf_logger` is a singleton static class providing simulation-wide logging with two
-independent controls:
+independent axes:
 
-- **Severity:** `DEBUG`, `INFO`, `WARNING`, `ERROR`, `FATAL`. Higher severities cannot
-  be suppressed. `FATAL` halts simulation.
-- **Per-component verbosity threshold:** Each `vrf_component` carries a verbosity level.
-  Messages below the component's threshold are dropped before reaching the logger output.
+- **Severity:** `LOG_INFO`, `LOG_WARN`, `LOG_ERROR`, `LOG_FATAL`. Higher severities
+  cannot be suppressed. `LOG_FATAL` halts simulation.
+- **Verbosity:** `LOG_NONE`, `LOG_LOW`, `LOG_HIGH`, `LOG_DEBUG`. Controls filtering of
+  `LOG_INFO` messages. The logger owns two verbosity tables (override and user) keyed
+  by hierarchical name strings; components are not responsible for storing their own
+  verbosity level. `LOG_WARN`, `LOG_ERROR`, and `LOG_FATAL` are never suppressed by
+  verbosity.
 
 ```
-vrf_logger::set_verbosity("uart_driver", DEBUG);    // verbose for this component
-vrf_logger::set_verbosity("axi_agent.*", WARNING);  // quiet for all AXI components
+vrf_logger::set_verbosity("root.env.uart_agent.driver", LOG_DEBUG);  // verbose for this component
+vrf_logger::set_verbosity("root.env.axi_agent",         LOG_NONE);   // quiet for all AXI components
 ```
+
+The second call covers all descendants of `root.env.axi_agent` via the parent-walk
+lookup; no per-component entries are needed.
 
 Output destinations: console, file, or both simultaneously.
 

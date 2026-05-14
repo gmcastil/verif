@@ -2,6 +2,49 @@
 
 ---
 
+## Session 6  -  2026-05-14
+
+### What Was Decided
+
+- **Logger macro split: `log_*` vs `report_*`.**
+  Two macro families cover all four severities (info, warn, error, fatal):
+  - `log_*` macros are for class scope. They insert `this.get_full_name()` automatically
+    as the name argument; the caller never touches the name string.
+  - `report_*` macros are for module and interface scope where `this` does not exist.
+    The caller supplies an explicit string literal as the first argument.
+
+- **String interface retained; `vrf_object` base class rejected.**
+  The idea of a `vrf_object` base class with `get_full_name()` was explored as a way to
+  prevent callers from logging under false names. It was rejected: the masquerade
+  problem is theoretical for an internal verification tool, and the string interface is
+  simpler and more uniform. The `log_*` macros enforce honest naming for all class-based
+  code by inserting `this.get_full_name()` at the call site; direct calls to
+  `vrf_logger::log()` with an arbitrary string are the designated back door for
+  non-class contexts.
+
+- **Sequences require `get_full_name()`.**
+  The `log_*` macros rely on `this.get_full_name()` compiling in sequence `body()` tasks.
+  `vrf_sequence` must therefore carry a name field set at construction and expose
+  `get_full_name()`. For sequences the method returns a flat name (e.g.,
+  `"uart_send_frame_seq"`), not a hierarchical path.
+
+### Open Design Decisions
+
+- `get_full_name()` vs `get_full_path()` - exact method name not yet pinned.
+
+### Next Steps
+
+1. Write SVUnit tests for `vrf_logger`
+2. Implement `vrf_logger`
+3. Define `vrf_component` base class interface
+4. Define `vrf_sequence_item` base class
+5. Define `vrf_objection` interface
+6. Add `make docs` target to Makefile
+7. Write tests for `vrf_config_db`
+8. Design `+config` mechanism (future session)
+
+---
+
 ## Session 5  -  2026-05-13
 
 ### What Was Decided

@@ -40,7 +40,8 @@ the verbosity threshold.
 ```systemverilog
 class vrf_logger;
 
-    // Primary log entry point. Macros call this after a successful is_enabled() check.
+    // Primary log entry point. Called by macros; direct calls are reserved for
+    // module and interface scope where macros are unavailable.
     static function void log(string name, vrf_severity_e severity,
                              vrf_verbosity_e verbosity, string msg,
                              string filename, int line_number);
@@ -52,6 +53,31 @@ class vrf_logger;
 
 endclass
 ```
+
+---
+
+### Macros
+
+Two macro families cover all four severities. Both expand to `vrf_logger::log()`.
+
+```systemverilog
+// Class scope - name derived from this.get_full_name() automatically.
+// Use from any class that implements get_full_name().
+`log_info(verbosity, msg)
+`log_warn(msg)
+`log_error(msg)
+`log_fatal(msg)
+
+// Module/interface scope - caller supplies an identifying string.
+// Use from tb.sv, interface initial blocks, and other non-class contexts.
+`report_info(name, verbosity, msg)
+`report_warn(name, msg)
+`report_error(name, msg)
+`report_fatal(name, msg)
+```
+
+`log_warn`, `log_error`, `log_fatal` and their `report_*` equivalents take no verbosity
+argument; the macro fixes verbosity to `LOG_NONE` so they always pass the filter.
 
 ---
 
@@ -160,13 +186,13 @@ populated before any component calls `set_verbosity()` or `log()`.
 // config phase - agent registers its verbosity from its config object
 vrf_logger::set_verbosity(this.get_full_name(), m_cfg.verbosity);
 
-// direct log call (normally issued through macros)
-vrf_logger::log(this.get_full_name(), LOG_INFO, LOG_HIGH,
-                "driving transaction", `__FILE__, `__LINE__);
+// class scope - name supplied automatically
+`log_info(LOG_HIGH, "driving transaction");
+`log_fatal("BFM handle not found");
 
-// fatal used directly without verbosity (not subject to filtering)
-vrf_logger::log(this.get_full_name(), LOG_FATAL, LOG_NONE,
-                "BFM handle not found", `__FILE__, `__LINE__);
+// module/interface scope - caller supplies name string
+`report_info("tb", LOG_LOW, "simulation started");
+`report_fatal("tb.uart_if", "clk not detected");
 ```
 
 ---
