@@ -1,0 +1,5 @@
+extern/uvm
+extern/svunit
+!extern/svunit/svunit_base
+ctags
+

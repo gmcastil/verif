@@ -3,3 +3,14 @@
 # Stuff left behind by the LSP
 *md_ltex.json
 
+# Artifacts
+tags
+
+# Tests create a lot of junk
+tests/**/tests.xml
+tests/**/.testrunner.sv
+tests/**/compile.log
+tests/**/.svunit.f
+tests/**/run.log
+tests/**/work
+tests/**/.__testsuite.sv

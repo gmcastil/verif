@@ -2,6 +2,129 @@
 
 ---
 
+## Session 8  -  2026-05-18
+
+### What Was Decided
+
+- **Verbosity levels reworked to match UVM.**
+  `vrf_verbosity_e` gains two new levels (`LOG_MEDIUM`, `LOG_FULL`) and explicit integer
+  values (0-5). Full set: `LOG_NONE=0`, `LOG_LOW=1`, `LOG_MEDIUM=2`, `LOG_HIGH=3`,
+  `LOG_FULL=4`, `LOG_DEBUG=5`. Semantics: LOW for key milestones (start/end of test,
+  major phase events), MEDIUM for general messages, HIGH for per-transaction detail,
+  FULL for state dumps, DEBUG for trace-level internal state. Global default threshold
+  changed from `LOG_LOW` to `LOG_MEDIUM`.
+
+- **`get_severity_count()` added to the main public interface.**
+  Not placed under `ifdef VRF_SVUNIT`. Rationale: the counts must already exist as
+  internal state for `summarize()` to work; `get_severity_count()` just exposes that
+  state via an accessor with no additional storage. Only messages that pass the
+  verbosity filter and are actually emitted are counted; suppressed messages are not.
+
+- **Output format documented as an annotated example.**
+  The format section now shows a single example string with a field-by-field table
+  (severity, file/line, sim time, context, ID tag, message). All four severities
+  produce the same format.
+
+- **`$timeformat` behavior settled.**
+  The logger uses `%t` and inherits whatever `$timeformat` the simulation environment
+  has set. The logger does not call `$timeformat` and has no mechanism to detect
+  whether it has been set. If unset, the simulator default applies (tool-dependent,
+  typically no unit suffix and wide padding). Testbenches set `$timeformat` in `tb.sv`;
+  SVUnit tests set it in `setup()`. Documented as a recommendation, not enforced.
+
+- **Test factory identified as a future design item.**
+  The "build once, run many" constraint requires runtime test selection without
+  recompilation. Without the UVM factory, a lightweight test registry (string-to-
+  constructor map, self-registration macro, `+vrf_testname` plusarg) is the planned
+  approach. Needs a dedicated design session before the bootstrap mechanism can be
+  finalized. Does not block logger work.
+
+- **`vrf_logger` independence from `vrf_component` confirmed.**
+  Unlike UVM where `uvm_info` macros require a `uvm_report_object` context, the VRF
+  logger takes a plain name string and has no dependency on `vrf_component`. The
+  masquerade risk (a caller lying about their name) is acceptable for an internal tool;
+  the `log_*` macros enforce honest naming for all class-based code. Direct calls to
+  `log()` are the intentional back door for non-class contexts.
+
+### Open Design Decisions
+
+None.
+
+### Next Steps
+
+1. Write SVUnit tests for `vrf_logger`
+2. Implement `vrf_logger`
+3. Define `vrf_component` base class interface
+4. Define `vrf_sequence_item` base class
+5. Define `vrf_objection` interface
+6. Add `make docs` target to Makefile
+7. Write tests for `vrf_config_db`
+8. Design test factory for runtime test selection
+9. Design `+config` mechanism (future session)
+
+---
+
+## Session 7  -  2026-05-17
+
+### What Was Decided
+
+- **`[id]` field added to the logger interface.**
+  All log calls now carry a caller-supplied `id` string that is rendered as `[id]`
+  between the component name and the message. This allows grepping a large simulation
+  log by category (`grep '\[UART_DRV\]'`) rather than chaining `grep -v` calls against
+  the full hierarchical name. An empty string renders as `[]`; the field is always
+  present and the format does not change shape. Confirmed against UVM 1.2 source
+  (`compose_report_message` in `uvm_report_server.svh`): UVM hardcodes `[` and `]` as
+  string literals with no conditional, so `[]` for an empty id is the UVM-idiomatic
+  behavior.
+
+- **All eight macro signatures updated to include `id`.**
+  `log_info`, `log_warn`, `log_error`, `log_fatal` and their `report_*` equivalents
+  each gain `id` as a required argument. The `warn`/`error`/`fatal` variants still fix
+  verbosity to `LOG_NONE` internally; `id` is the only addition.
+
+- **Time units via `$timeformat`, not raw `$time`.**
+  The output format changes from `@ <time>` to `@ <time><unit>`. The logger formats
+  time with `%0t` (respecting whatever `$timeformat` is active). Setting `$timeformat`
+  is the testbench's responsibility; `tb.sv` calls it in an `initial` block before any
+  phase runs. SVUnit tests must also set `$timeformat` before the first log call.
+  Confirmed from UVM source: `$swrite(time_str, "%0t", $time)` is how UVM does it.
+
+- **`VRF_INFO`-style severity prefix and `WARNING` spelling rejected.**
+  Considered for UVM familiarity; rejected as visual noise. Severity labels remain
+  `INFO`, `WARN`, `ERROR`, `FATAL`.
+
+- **Per-severity message counts and `summarize()` added.**
+  The logger tracks a count of messages emitted at each severity level. At the end of
+  the report phase, `vrf_phase_manager` calls `vrf_logger::get_inst().summarize()`,
+  which prints a one-line summary to console (and log file if open). Users do not call
+  `summarize()` directly. `reset()` (SVUnit only) clears the counts along with all
+  other state.
+
+- **Logger established as foundational framework infrastructure.**
+  All framework components communicate to the user through the logger. The dependency
+  from `vrf_phase_manager` and all components onto `vrf_logger` is intentional,
+  one-way, and documented. The phase manager calling `summarize()` is the first
+  instance of a broader pattern: framework-level bookkeeping belongs in the phase
+  machinery so users are not required to remember it.
+
+### Open Design Decisions
+
+None.
+
+### Next Steps
+
+1. Write SVUnit tests for `vrf_logger`
+2. Implement `vrf_logger`
+3. Define `vrf_component` base class interface
+4. Define `vrf_sequence_item` base class
+5. Define `vrf_objection` interface
+6. Add `make docs` target to Makefile
+7. Write tests for `vrf_config_db`
+8. Design `+config` mechanism (future session)
+
+---
+
 ## Session 6  -  2026-05-14
 
 ### What Was Decided
@@ -28,9 +151,43 @@
   `get_full_name()`. For sequences the method returns a flat name (e.g.,
   `"uart_send_frame_seq"`), not a hierarchical path.
 
+- **`get_full_name()` chosen as the canonical method name.**
+  Consistent with UVM, which provides `get_name()` (local name) and `get_full_name()`
+  (full hierarchical path). There is no `get_full_path()` in the UVM API. All framework
+  components and sequences expose `get_full_name()`.
+
+- **`vrf_logger::reset()` added for SVUnit test isolation.**
+  SVUnit runs all tests in a single simulation, so static logger state leaks between
+  tests. `reset()` destroys the singleton instance and clears all internal state: both
+  verbosity tables, the global default, the log file handle, the initialized flag, and
+  the singleton handle. The next call to `log()` or `set_verbosity()` re-initializes
+  from scratch. The entire function definition is guarded by `ifdef VRF_SVUNIT` so it
+  does not exist in production builds and cannot be called accidentally. `+define+VRF_SVUNIT`
+  is set by the test build only. Tests that require different plusarg-derived state go
+  in separate test modules, each run as a separate simulation with its own plusarg set.
+
+- **Project directory structure established.**
+  Framework source lives in `vrf_pkg/`. SVUnit tests live in `tests/`, with one
+  subdirectory per component under test (e.g., `tests/vrf_logger/`,
+  `tests/vrf_config_db/`). Each subdirectory contains all test modules for that
+  component; test modules that require different plusarg sets are separate files,
+  each run as its own simulation. A top-level Makefile runs all suites.
+
+- **Package structure established.**
+  All framework base classes compile into a single `vrf_pkg`. No sub-packages.
+  Protocol-specific packages (`uart_bfm_pkg`, `uart_agent_pkg`, etc.) are separate
+  and live outside `vrf_pkg`. The user-facing interface is two lines, consistent
+  with the UVM pattern:
+  ```
+  import vrf_pkg::*;
+  `include "vrf_pkg.svh"
+  ```
+  `vrf_pkg.svh` contains all macro definitions (`log_*`, `report_*`, etc.) that
+  cannot live inside a package.
+
 ### Open Design Decisions
 
-- `get_full_name()` vs `get_full_path()` - exact method name not yet pinned.
+None.
 
 ### Next Steps
 

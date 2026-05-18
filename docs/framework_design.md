@@ -321,15 +321,16 @@ independent axes:
 
 - **Severity:** `LOG_INFO`, `LOG_WARN`, `LOG_ERROR`, `LOG_FATAL`. Higher severities
   cannot be suppressed. `LOG_FATAL` halts simulation.
-- **Verbosity:** `LOG_NONE`, `LOG_LOW`, `LOG_HIGH`, `LOG_DEBUG`. Controls filtering of
-  `LOG_INFO` messages. The logger owns two verbosity tables (override and user) keyed
-  by hierarchical name strings; components are not responsible for storing their own
+- **Verbosity:** `LOG_NONE`, `LOG_LOW`, `LOG_MEDIUM`, `LOG_HIGH`, `LOG_FULL`,
+  `LOG_DEBUG`. Controls filtering of `LOG_INFO` messages. Default threshold is
+  `LOG_MEDIUM`. The logger owns two verbosity tables (override and user) keyed by
+  hierarchical name strings; components are not responsible for storing their own
   verbosity level. `LOG_WARN`, `LOG_ERROR`, and `LOG_FATAL` are never suppressed by
   verbosity.
 
 ```
-vrf_logger::set_verbosity("root.env.uart_agent.driver", LOG_DEBUG);  // verbose for this component
-vrf_logger::set_verbosity("root.env.axi_agent",         LOG_NONE);   // quiet for all AXI components
+vrf_logger::get_inst().set_verbosity("root.env.uart_agent.driver", LOG_DEBUG);  // verbose for this component
+vrf_logger::get_inst().set_verbosity("root.env.axi_agent",         LOG_NONE);   // quiet for all AXI components
 ```
 
 The second call covers all descendants of `root.env.axi_agent` via the parent-walk
