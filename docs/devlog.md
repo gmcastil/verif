@@ -33,26 +33,64 @@
 - **`severity_to_str()`, `get_verbosity()`, `populate_override_table()` are all `local`.**
   Implementation details with no reason to be visible outside the class.
 
+- **`get_verbosity()`, `populate_override_table()`, and `add_override_entry()` implemented.**
+  `get_parent(name)` is a local helper that strips the rightmost `.component` segment
+  and returns `""` when no `.` remains. `get_verbosity(name)` checks the override table
+  for an exact match, then walks up via `get_parent()` until a match is found or the
+  name is exhausted, then falls back to `m_global_default`. `populate_override_table()`
+  splits on `,` and calls `add_override_entry()` for each token. `add_override_entry()`
+  splits on `:`, looks up the level string in `m_verbosity_map`, and writes to
+  `m_override_table`. Bad entries (missing colon, unknown level string) issue a
+  `$warning` and are skipped. `m_verbosity_map` is a local associative array populated
+  once in `new()`.
+
+- **`log()` now routes through `get_verbosity(name)` for the verbosity check.**
+  The direct `m_global_default` reference in the INFO suppression guard is replaced
+  with `get_verbosity(name)`. Per-component overrides and parent walk are now active.
+
+- **All three `vrf_logger` test suites passing.**
+  `vrf_logger_basic_unit_test.sv` (9 tests), `vrf_logger_set_verbosity_unit_test.sv`
+  (4 tests), `vrf_logger_verbosity_none_unit_test.sv` (4 tests). All 17 tests pass.
+
+- **Test results summary script identified as a needed tool.**
+  As the framework grows, navigating individual run logs to find pass/fail status is
+  impractical. A script will walk the tests directory tree, find run logs, and print
+  a two-level summary: component name with suite aggregate on the first level,
+  subdirectory name with test counts on the second. Failures are called out inline.
+
 ### Open Design Decisions
 
 None.
 
 ### Next Steps
 
-1. Implement `get_verbosity()` and `populate_override_table()`
-2. Replace direct `m_global_default` reference in `log()` with `get_verbosity(name)`
-3. Implement `summarize()`
-4. Make `severity_to_str()` `local`
-5. Clean up remaining comments in `vrf_logger.svh`
-6. Fill in `vrf_logger_verbosity_none_unit_test.sv` test bodies
-7. Fill in `vrf_logger_set_verbosity_unit_test.sv` test bodies
-8. Define `vrf_component` base class interface
-9. Define `vrf_sequence_item` base class
-10. Define `vrf_objection` interface
-11. Add `make docs` target to Makefile
-12. Write tests for `vrf_config_db`
-13. Design test factory for runtime test selection
-14. Design `+config` mechanism (future session)
+1. Write test results summary script (`scripts/summarize_results`). Intended output
+   format -- one line per component with suite aggregate, indented line per suite with
+   test counts, FAILED called out inline:
+
+   ```
+   vrf_logger                    3 / 3 suites passing
+     basic                       9 / 9 tests passing
+     set_verbosity               4 / 4 tests passing
+     verbosity_none              4 / 4 tests passing
+
+   vrf_component                 2 / 3 suites passing
+     build                       5 / 5 tests passing
+     connect                     3 / 5 tests passing  FAILED
+   ```
+
+   Script takes a directory argument, walks component subdirectories, finds
+   `run.log` in each suite subdirectory, and parses the SVUnit summary line.
+
+2. Implement `summarize()`
+3. Clean up remaining comments in `vrf_logger.svh`
+4. Define `vrf_component` base class interface
+5. Define `vrf_sequence_item` base class
+6. Define `vrf_objection` interface
+7. Add `make docs` target to Makefile
+8. Write tests for `vrf_config_db`
+9. Design test factory for runtime test selection
+10. Design `+config` mechanism (future session)
 
 ---
 

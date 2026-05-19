@@ -10,6 +10,8 @@ class vrf_logger;
     local int m_severity_counts[vrf_severity_e];
     // Default log verbosity, can be overriden by $value$plusargs 'vrf_verbosity'
     local vrf_verbosity_e m_global_default;
+    // Convenience map for mapping names to log verbosity levels
+    local vrf_verbosity_e m_verbosity_map[string];
     // Optional log file via $value$plusargs 'vrf_log_file'. Closed in the summarize phase.
     local int m_log_fd;
     local bit m_log_to_file;
@@ -21,34 +23,25 @@ class vrf_logger;
     // verilog_format: off
     local function new();
     // verilog_format: on
-        string level_str;
+        string verbosity_str;
         string log_file_str;
+        string entries_str;
+
+        // Populate the log verbosity map so it can be used by other members
+        m_verbosity_map["NONE"]   = LOG_NONE;
+        m_verbosity_map["LOW"]    = LOG_LOW;
+        m_verbosity_map["MEDIUM"] = LOG_MEDIUM;
+        m_verbosity_map["HIGH"]   = LOG_HIGH;
+        m_verbosity_map["FULL"]   = LOG_FULL;
+        m_verbosity_map["DEBUG"]  = LOG_DEBUG;
 
         // Set the global verbosity
-        if ($value$plusargs("vrf_verbosity=%s", level_str)) begin
-            case (level_str)
-                "NONE": begin
-                    m_global_default = LOG_NONE;
-                end
-                "LOW": begin
-                    m_global_default = LOG_LOW;
-                end
-                "MEDIUM": begin
-                    m_global_default = LOG_MEDIUM;
-                end
-                "HIGH": begin
-                    m_global_default = LOG_HIGH;
-                end
-                "FULL": begin
-                    m_global_default = LOG_FULL;
-                end
-                "DEBUG": begin
-                    m_global_default = LOG_DEBUG;
-                end
-                default: begin
-                    m_global_default = LOG_MEDIUM;
-                end
-            endcase
+        if ($value$plusargs("vrf_verbosity=%s", verbosity_str)) begin
+            if (m_verbosity_map.exists(verbosity_str)) begin
+                m_global_default = m_verbosity_map[verbosity_str];
+            end else begin
+                $fatal(1, "vrf_logger: illegal log verbosity: %s", verbosity_str);
+            end
         end else begin
             m_global_default = LOG_MEDIUM;
         end
@@ -71,6 +64,9 @@ class vrf_logger;
         m_severity_counts[LOG_FATAL] = 0;
 
         // Populate the verbosity override table (TODO)
+        if ($value$plusargs("vrf_set_verbosity=%s", entries_str)) begin
+            populate_override_table(entries_str);
+        end
 
     endfunction : new
 
@@ -83,13 +79,14 @@ class vrf_logger;
         return m_inst;
     endfunction : get_inst
 
+    // Central logging function
     function void log(string name, vrf_severity_e severity, vrf_verbosity_e verbosity, string id,
                       string msg, string filename, int line_number);
         string fmt;
         string fmt_msg;
 
         // Guard first to make sure we're actually logging something
-        if (severity == LOG_INFO && verbosity > m_global_default) begin
+        if (severity == LOG_INFO && verbosity > get_verbosity(name)) begin
             return;
         end
 
@@ -146,13 +143,75 @@ class vrf_logger;
     // Given a hierarchical name, returns the verbosity level to apply. Checks the override table
     // first for an exact match, and if it isn't found, walks up the name, until it either finds
     // one in the table or fails, in which caes it uses the global default instead
-    local function get_verbosity(string name);
+    local function vrf_verbosity_e get_verbosity(string name);
+        // First, look up the hierarchical name directly
+        if (m_override_table.exists(name)) begin
+            return m_override_table[name];
+        end else begin
+            while (1) begin
+                name = get_parent(name);
+                if (name != "") begin
+                    if (m_override_table.exists(name)) begin
+                        return m_override_table[name];
+                    end
+                end else begin
+                    return m_global_default;
+                end
+            end
+        end
     endfunction : get_verbosity
 
     // Parse the comma-delimited string of entries, each containing a hierarchical name and severity
     // pair separated by a colon, then populate the override table
-    local function populate_override_table(string entries);
+    local function void populate_override_table(string entries);
+
+        int i;
+        int start;
+        string token;
+
+        i = 0;
+        start = 0;
+
+        // Iterate over the entries string effectively slicing it from start to finish using commas
+        while (i <= entries.len()) begin
+            if (i == entries.len() || entries.getc(i) == ",") begin
+                token = entries.substr(start, i - 1);
+                if (!add_override_entry(token)) begin
+                    $warning("vrf_logger: ignoring bad +vrf_set_verbosity entry %s", token);
+                end
+                start = i + 1;
+            end
+            i++;
+        end
     endfunction : populate_override_table
+
+    // Takes a colon separated string representing a name to log_verbosity_e value to add to the
+    // runtime override table
+    local function bit add_override_entry(string entry);
+
+        int i;
+        string name;
+        string verbosity_str;
+
+        name = "";
+        // Split the string on the `:` and capture the name and verbosity level
+        for (i = 0; i < entry.len(); i++) begin
+            if (entry.getc(i) == ":") begin
+                name = entry.substr(0, i - 1);
+                verbosity_str = entry.substr(i + 1, entry.len() - 1);
+                break;
+            end
+        end
+
+        // Look up the verbosity level and store it in the override table
+        if (!m_verbosity_map.exists(verbosity_str)) begin
+            return 0;
+        end else begin
+            m_override_table[name] = m_verbosity_map[verbosity_str];
+            return 1;
+        end
+
+    endfunction : add_override_entry
 
 `ifdef VRF_SVUNIT
     // SVUnit tests need to be able to clear the logger so that it can be reused, without each
@@ -170,3 +229,17 @@ class vrf_logger;
 
 endclass : vrf_logger
 
+// Return parent in a hierarchical string. If its the top level of the hierarchy, it returns "".
+function automatic string get_parent(string name);
+    int last_dot;
+    last_dot = -1;
+
+    for (int i = name.len() - 1; i >= 0; i--) begin
+        if (name.getc(i) == ".") begin
+            last_dot = i;
+            return name.substr(0, last_dot - 1);
+        end
+    end
+    return "";
+
+endfunction : get_parent
