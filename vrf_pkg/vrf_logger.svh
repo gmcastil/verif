@@ -63,7 +63,7 @@ class vrf_logger;
         m_severity_counts[LOG_ERROR] = 0;
         m_severity_counts[LOG_FATAL] = 0;
 
-        // Populate the verbosity override table (TODO)
+        // Populate the verbosity override table
         if ($value$plusargs("vrf_set_verbosity=%s", entries_str)) begin
             populate_override_table(entries_str);
         end
@@ -142,7 +142,7 @@ class vrf_logger;
 
     // Given a hierarchical name, returns the verbosity level to apply. Checks the override table
     // first for an exact match, and if it isn't found, walks up the name, until it either finds
-    // one in the table or fails, in which caes it uses the global default instead
+    // one in the table or fails, in which case it uses the global default instead
     local function vrf_verbosity_e get_verbosity(string name);
         // First, look up the hierarchical name directly
         if (m_override_table.exists(name)) begin
@@ -160,6 +160,21 @@ class vrf_logger;
             end
         end
     endfunction : get_verbosity
+
+    // Return parent in a hierarchical string. If its the top level of the hierarchy, it returns "".
+    local function automatic string get_parent(string name);
+        int last_dot;
+        last_dot = -1;
+
+        for (int i = name.len() - 1; i >= 0; i--) begin
+            if (name.getc(i) == ".") begin
+                last_dot = i;
+                return name.substr(0, last_dot - 1);
+            end
+        end
+        return "";
+
+    endfunction : get_parent
 
     // Parse the comma-delimited string of entries, each containing a hierarchical name and severity
     // pair separated by a colon, then populate the override table
@@ -229,17 +244,3 @@ class vrf_logger;
 
 endclass : vrf_logger
 
-// Return parent in a hierarchical string. If its the top level of the hierarchy, it returns "".
-function automatic string get_parent(string name);
-    int last_dot;
-    last_dot = -1;
-
-    for (int i = name.len() - 1; i >= 0; i--) begin
-        if (name.getc(i) == ".") begin
-            last_dot = i;
-            return name.substr(0, last_dot - 1);
-        end
-    end
-    return "";
-
-endfunction : get_parent
