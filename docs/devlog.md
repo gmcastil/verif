@@ -2,6 +2,60 @@
 
 ---
 
+## Session 9  -  2026-05-19
+
+### What Was Decided
+
+- **Basic unit test suite for `vrf_logger` completed.**
+  All eight tests in `vrf_logger_basic_unit_test.sv` are passing. Tests call `log()`
+  directly (no macros) and assert against `last_msg()` using `FAIL_UNLESS_STR_EQUAL`.
+
+- **`last_msg()` retains the previous value on a suppressed call.**
+  A suppressed `log()` call returns immediately without touching `m_last_msg`. The
+  suppression tests verify this by asserting the previous message is still held after
+  a suppressed call.
+
+- **Log file closed in `summarize()`, not `reset()`.**
+  `summarize()` is the natural end of the logger lifecycle. `reset()` only nulls
+  `m_inst`; file cleanup belongs with the final output.
+
+- **`$fatal(1)` called from within `log()` for `LOG_FATAL`.**
+  The log file is closed before `$fatal(1)`. This is the sole point of early
+  termination in the framework.
+
+- **`get_threshold()` renamed to `get_verbosity(name)`.**
+  More caller-facing: returns the verbosity level that applies to the named component.
+
+- **`parse_set_verbosity()` renamed to `populate_override_table(entries)`.**
+  Name describes what it produces, not how. Called once from `new()` when
+  `+vrf_set_verbosity` is present. `entries` is the raw comma-delimited string.
+
+- **`severity_to_str()`, `get_verbosity()`, `populate_override_table()` are all `local`.**
+  Implementation details with no reason to be visible outside the class.
+
+### Open Design Decisions
+
+None.
+
+### Next Steps
+
+1. Implement `get_verbosity()` and `populate_override_table()`
+2. Replace direct `m_global_default` reference in `log()` with `get_verbosity(name)`
+3. Implement `summarize()`
+4. Make `severity_to_str()` `local`
+5. Clean up remaining comments in `vrf_logger.svh`
+6. Fill in `vrf_logger_verbosity_none_unit_test.sv` test bodies
+7. Fill in `vrf_logger_set_verbosity_unit_test.sv` test bodies
+8. Define `vrf_component` base class interface
+9. Define `vrf_sequence_item` base class
+10. Define `vrf_objection` interface
+11. Add `make docs` target to Makefile
+12. Write tests for `vrf_config_db`
+13. Design test factory for runtime test selection
+14. Design `+config` mechanism (future session)
+
+---
+
 ## Session 8  -  2026-05-18
 
 ### What Was Decided

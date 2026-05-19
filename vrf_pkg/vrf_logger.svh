@@ -2,7 +2,8 @@ class vrf_logger;
 
     static local vrf_logger m_inst = null;
 
-    // Store verbosity overrides at runtime
+    // Store verbosity overrides at runtime, with key-value pairs the full hierarchical name and the
+    // verbosity level to set that component
     local vrf_verbosity_e m_override_table[string];
     // Maintain a count of the number of messages logged at each severity for
     // reporting
@@ -122,7 +123,7 @@ class vrf_logger;
         return m_severity_counts[severity];
     endfunction : get_severity_count
 
-    function string severity_to_str(vrf_severity_e severity);
+    local function string severity_to_str(vrf_severity_e severity);
         case (severity)
             LOG_INFO: begin
                 return "INFO";
@@ -141,6 +142,17 @@ class vrf_logger;
             end
         endcase
     endfunction : severity_to_str
+
+    // Given a hierarchical name, returns the verbosity level to apply. Checks the override table
+    // first for an exact match, and if it isn't found, walks up the name, until it either finds
+    // one in the table or fails, in which caes it uses the global default instead
+    local function get_verbosity(string name);
+    endfunction : get_verbosity
+
+    // Parse the comma-delimited string of entries, each containing a hierarchical name and severity
+    // pair separated by a colon, then populate the override table
+    local function populate_override_table(string entries);
+    endfunction : populate_override_table
 
 `ifdef VRF_SVUNIT
     // SVUnit tests need to be able to clear the logger so that it can be reused, without each

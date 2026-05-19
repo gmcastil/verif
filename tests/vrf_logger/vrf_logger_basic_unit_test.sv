@@ -25,6 +25,13 @@ module vrf_logger_basic_unit_test;
 
     `SVUNIT_TESTS_BEGIN
 
+    // Demonstrate that the test-only reset actualy returns a new object
+    `SVTEST(logger_singleton_reset_succeeds)
+        vrf_logger logger = vrf_logger::get_inst();
+        vrf_logger::reset();
+        `FAIL_UNLESS(logger != vrf_logger::get_inst());
+    `SVTEST_END
+
     // INFO at LOG_LOW passed default threshold; format correct
     `SVTEST(log_info_low_passes_default_filter)
         string expected;
