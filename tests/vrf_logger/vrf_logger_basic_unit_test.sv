@@ -2,7 +2,7 @@ import vrf_pkg::*;
 
 `include "svunit_defines.svh"
 
-module vrf_logger_unit_test;
+module vrf_logger_basic_unit_test;
     import svunit_pkg::svunit_testcase;
 
     string name = "vrf_logger_ut";
@@ -29,6 +29,10 @@ module vrf_logger_unit_test;
 
     // INFO at LOG_HIGH suppressed; last_msg() stays ""
     `SVTEST(log_info_high_suppressed_by_default_filter)
+    `SVTEST_END
+
+    // INFO at LOG_FULL suppressed; last_msg() stays ""
+    `SVTEST(log_info_full_suppressed_by_default_filter)
     `SVTEST_END
 
     // WARN always emitted regardless of verbosity

@@ -46,14 +46,53 @@
   the `log_*` macros enforce honest naming for all class-based code. Direct calls to
   `log()` are the intentional back door for non-class contexts.
 
+- **Verbosity filtering is LOG_INFO-only; LOG_NONE semantics clarified.**
+  WARN, ERROR, and FATAL bypass the verbosity filter entirely -- they are never
+  compared against the threshold and always emit. The previous spec described this
+  by fixing their verbosity to LOG_NONE (0), which was an implementation leak that
+  created confusing dual semantics for LOG_NONE. The correct model: the verbosity
+  check is skipped for any severity other than INFO. LOG_NONE as a threshold cleanly
+  means "suppress all INFO output from this component." No special-case value needed.
+
+- **Intended verbosity usage model clarified; user table removed.**
+  The primary use case for per-component verbosity is: set the global default to
+  `LOG_NONE` or `LOG_LOW`, then selectively raise verbosity for the components under
+  active development or investigation. Fine-grained filtering of a fully-verbose log is
+  handled by the `[id]` field via grep, not by verbosity manipulation.
+  The user table (populated by `set_verbosity()` during `config` phase from config
+  object fields) was removed as unnecessary. The test author is the same person setting
+  plusargs; two mechanisms for the same thing add complexity without value. The
+  `set_verbosity()` method is removed from the public interface. Verbosity lookup
+  simplifies to: override table (exact match, then parent walk), then global default.
+  Per-component overrides are set via `+vrf_set_verbosity` using a delimited string:
+  `+vrf_set_verbosity=path1:level1,path2:level2`. This avoids DPI, indexed plusargs, and
+  external files while supporting an arbitrary number of entries. UVM uses DPI to work
+  around the `$value$plusargs` single-match limitation; VRF avoids that dependency by
+  encoding all entries in the value string of a single plusarg.
+  Level strings in both plusargs omit the `LOG_` prefix: `NONE`, `LOW`, `MEDIUM`,
+  `HIGH`, `FULL`, `DEBUG`. This is consistent with the output format where severity
+  labels appear as `INFO`, `WARN`, etc. without a prefix.
+
 ### Open Design Decisions
 
 None.
 
+### Test Modules Written
+
+Three SVUnit test modules exist under `tests/vrf_logger/` with stub test cases:
+
+- `vrf_logger_basic_unit_test.sv` - default plusarg environment; covers filter behavior,
+  singleton, id rendering, severity counts
+- `vrf_logger_verbosity_none_unit_test.sv` - requires `+vrf_verbosity=LOG_NONE`;
+  covers global threshold override suppressing INFO, WARN/ERROR still emit
+- `vrf_logger_set_verbosity_unit_test.sv` - requires
+  `+vrf_set_verbosity=root.env.uart_agent:LOG_HIGH`; covers per-component override,
+  non-overridden component falls back to global default, parent walk inheritance
+
 ### Next Steps
 
-1. Write SVUnit tests for `vrf_logger`
-2. Implement `vrf_logger`
+1. Implement `vrf_logger`
+2. Fill in SVUnit test bodies
 3. Define `vrf_component` base class interface
 4. Define `vrf_sequence_item` base class
 5. Define `vrf_objection` interface

@@ -3,15 +3,17 @@ SCRIPTS_DIR		:= $(REPO_DIR)/scripts
 
 .PHONY: test
 test:
-	REPO_DIR=$(REPO_DIR) $(SCRIPTS_DIR)/run_svunit --sim questa -f vrf_logger.f
+	REPO_DIR=$(REPO_DIR) $(SCRIPTS_DIR)/run_svunit --sim questa -f vrf_logger.f \
+	-t vrf_logger_basic_unit_test.sv -o basic
+	REPO_DIR=$(REPO_DIR) $(SCRIPTS_DIR)/run_svunit --sim questa -f vrf_logger.f \
+	-t vrf_logger_set_verbosity_unit_test.sv -o set_verbosity \
+	-r +vrf_set_verbosity=root.env.uart_agent:HIGH
+	REPO_DIR=$(REPO_DIR) $(SCRIPTS_DIR)/run_svunit --sim questa -f vrf_logger.f \
+	-t vrf_logger_verbosity_none_unit_test.sv -o verbosity_none \
+	-r +vrf_verbosity=NONE
 
 .PHONY: clean
 clean:
-	rm -rf qrun.out
-	rm -rf work
-	rm -f .__testsuite.sv
-	rm -f tests.xml
-	rm -f .testrunner.sv
-	rm -f compile.log
-	rm -f .svunit.f
-	rm -f run.log
+	rm -rf basic
+	rm -rf set_verbosity
+	rm -rf verbosity_none

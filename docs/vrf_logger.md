@@ -31,15 +31,15 @@ typedef enum {
 } vrf_verbosity_e;
 ```
 
-An `INFO` message is emitted when its verbosity value is less than or equal to the
-active threshold. `LOG_NONE` (0) always passes the filter regardless of threshold.
+Verbosity filtering applies only to `LOG_INFO` messages. A `LOG_INFO` message is
+emitted when its verbosity value is less than or equal to the active threshold.
 `LOG_DEBUG` (5) requires the threshold to be explicitly set to `LOG_DEBUG`. The
 compiled-in global default threshold is `LOG_MEDIUM`. `LOG_WARN`, `LOG_ERROR`, and
-`LOG_FATAL` are never suppressed by the verbosity threshold.
+`LOG_FATAL` are never compared against the verbosity threshold; they always emit.
 
 | Level        | Value | Typical use                                          |
 | ------------ | ----- | ---------------------------------------------------- |
-| `LOG_NONE`   | 0     | Always emitted; used internally for WARN/ERROR/FATAL |
+| `LOG_NONE`   | 0     | Suppresses all INFO output when used as a threshold  |
 | `LOG_LOW`    | 1     | Key milestones: start/end of test, major phase events|
 | `LOG_MEDIUM` | 2     | General messages; default threshold                  |
 | `LOG_HIGH`   | 3     | Per-transaction detail, data values                  |
@@ -73,15 +73,10 @@ class vrf_logger;
     // for direct use; the framework calls it automatically.
     function void summarize();
 
-    // Write a verbosity threshold entry to the user table.
-    // Called by components during config phase using their config object's
-    // verbosity field.
-    function void set_verbosity(string name, vrf_verbosity_e level);
-
 `ifdef VRF_SVUNIT
     // Destroy the singleton instance and clear all internal state. Only
-    // available in SVUnit builds. Resets: both verbosity tables, global
-    // default, log file handle, initialized flag, and singleton handle.
+    // available in SVUnit builds. Resets: override table, global default,
+    // log file handle, initialized flag, and singleton handle.
     // The next call to get_inst() re-initializes from scratch.
     // +define+VRF_SVUNIT is set by the test build; it must not appear in
     // production builds. Plusargs are frozen at time zero and do not change,
@@ -123,7 +118,7 @@ Two macro families cover all four severities. Both expand to `vrf_logger::get_in
 ```
 
 `log_warn`, `log_error`, `log_fatal` and their `report_*` equivalents take no verbosity
-argument; the macro fixes verbosity to `LOG_NONE` so they always pass the filter.
+argument; verbosity filtering does not apply to these severities.
 
 `id` is a short caller-supplied string used to categorize messages (e.g., `"UART_DRV"`).
 Pass `""` when no category is needed; the logger renders it as `[]`. A single component
@@ -133,26 +128,23 @@ may use multiple ids to distinguish message categories.
 
 ### Verbosity Lookup
 
-The logger maintains two internal tables, both associative arrays keyed by
-hierarchical name strings:
+The logger maintains one internal table, an associative array keyed by hierarchical
+name strings:
 
-- **Override table** - populated from plusargs at initialization. Never modified
-  after that. Always takes precedence.
-- **User table** - populated by calls to `set_verbosity()` during `config` phase.
+- **Override table** - populated from `+vrf_set_verbosity` at initialization. Never
+  modified after that.
 
 Lookup order for a given `name`:
 
 1. Exact match in override table
 2. Parent walk in override table (strip trailing `.segment` iteratively)
-3. Exact match in user table
-4. Parent walk in user table
-5. Global default: `LOG_MEDIUM` (compiled-in)
+3. Global default: `LOG_MEDIUM` (compiled-in; overridden by `+vrf_verbosity`)
 
 The parent walk strips one `.segment` at a time from the right of the name string
 until a match is found or the string is empty. An empty string exhausts the chain;
 the global default applies.
 
-Setting `"root.env.uart_agent"` in either table covers all descendants
+Setting `"root.env.uart_agent"` in the override table covers all descendants
 (`"root.env.uart_agent.driver"`, `"root.env.uart_agent.monitor"`, etc.) via the
 parent walk, with no individual entries required.
 
@@ -163,9 +155,9 @@ parent walk, with no individual entries required.
 | Severity    | Verbosity filtered | Halts simulation  |
 | ----------- | ------------------ | ----------------- |
 | `LOG_INFO`  | yes                | no                |
-| `LOG_WARN`  | no                 | no                |
-| `LOG_ERROR` | no                 | no                |
-| `LOG_FATAL` | no                 | yes (`$fatal(1)`) |
+| `LOG_WARN`  | no - always emits  | no                |
+| `LOG_ERROR` | no - always emits  | no                |
+| `LOG_FATAL` | no - always emits  | yes (`$fatal(1)`) |
 
 ---
 
@@ -207,36 +199,40 @@ is written to that file simultaneously.
 
 ### Plusarg Interface
 
-| Plusarg                             | Effect                                            |
-| ----------------------------------- | ------------------------------------------------- |
-| `+vrf_verbosity=<level>`            | Override global default (LOG_NONE/LOW/MEDIUM/HIGH/FULL/DEBUG) |
-| `+vrf_set_verbosity=<path>:<level>` | Add entry to override table; repeatable           |
-| `+vrf_log_file=<filepath>`          | Write all output to file in addition to console   |
+| Plusarg                                      | Effect                                                        |
+| -------------------------------------------- | ------------------------------------------------------------- |
+| `+vrf_verbosity=<level>`                     | Override global default (NONE/LOW/MEDIUM/HIGH/FULL/DEBUG)     |
+| `+vrf_set_verbosity=<path>:<level>[,...]`    | Populate override table; comma-delimited, arbitrary entries   |
+| `+vrf_log_file=<filepath>`                   | Write all output to file in addition to console               |
 
 Plusargs are parsed once during logger initialization before any phase runs.
-`+vrf_set_verbosity` may appear multiple times; each instance adds one entry.
+All per-component overrides are encoded in a single `+vrf_set_verbosity` value,
+comma-delimited. Each entry is `<path>:<level>`. Level strings omit the `LOG_`
+prefix: `NONE`, `LOW`, `MEDIUM`, `HIGH`, `FULL`, `DEBUG`. This matches the
+convention used in output messages (`INFO`, `WARN`, etc.) where the prefix is
+omitted as noise.
 
 Example:
 
 ```
-+vrf_verbosity=LOG_MEDIUM
-+vrf_set_verbosity=root.env.uart_agent:LOG_DEBUG
-+vrf_set_verbosity=root.env.axi_agent:LOG_NONE
++vrf_verbosity=NONE
++vrf_set_verbosity=root.env.uart_agent:HIGH,root.env.uart_agent.driver:DEBUG
 +vrf_log_file=sim.log
 ```
 
 ---
+
 
 ### Initialization
 
 The logger initializes on first use. Initialization:
 
 1. Parses `+vrf_verbosity` and sets the global default if present
-2. Parses all `+vrf_set_verbosity` entries into the override table
+2. Parses `+vrf_set_verbosity`, splits on `,`, and loads each `path:level` pair into the override table
 3. Opens the log file if `+vrf_log_file` is present
 
 Initialization happens before any phase runs, so the override table is fully
-populated before any component calls `set_verbosity()` or `log()`.
+populated before any component calls `log()`.
 
 ---
 
@@ -245,9 +241,6 @@ populated before any component calls `set_verbosity()` or `log()`.
 ```systemverilog
 // tb.sv - set time units before any phase runs
 initial $timeformat(-9, 0, " ns", 0);
-
-// config phase - agent registers its verbosity from its config object
-vrf_logger::get_inst().set_verbosity(this.get_full_name(), m_cfg.verbosity);
 
 // class scope - name and id supplied by caller
 `log_info("UART_DRV", LOG_HIGH, "driving transaction");
@@ -262,15 +255,12 @@ vrf_logger::get_inst().set_verbosity(this.get_full_name(), m_cfg.verbosity);
 
 ### Notes
 
-- `LOG_WARN`, `LOG_ERROR`, and `LOG_FATAL` never require a verbosity argument at
-  the semantic level; macros fix the verbosity to `LOG_NONE` for these severities
-  so they always pass the filter
+- `LOG_WARN`, `LOG_ERROR`, and `LOG_FATAL` are not subject to verbosity filtering;
+  the verbosity check is skipped entirely for these severities
 - The logger is intentionally free of any dependency on `vrf_component`; it can be
   instantiated and used before any component exists
 - Non-component callers (sequences, static classes) pass any identifying string as
   `name`; the parent walk applies to them identically
-- `set_verbosity()` writes to the user table only; the override table is read-only
-  after initialization
 - An unrecognized plusarg level string is ignored and the default is retained
 - The logger is foundational framework infrastructure; all framework components
   communicate to the user through it. The dependency from `vrf_phase_manager` and

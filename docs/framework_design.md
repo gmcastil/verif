@@ -323,10 +323,10 @@ independent axes:
   cannot be suppressed. `LOG_FATAL` halts simulation.
 - **Verbosity:** `LOG_NONE`, `LOG_LOW`, `LOG_MEDIUM`, `LOG_HIGH`, `LOG_FULL`,
   `LOG_DEBUG`. Controls filtering of `LOG_INFO` messages. Default threshold is
-  `LOG_MEDIUM`. The logger owns two verbosity tables (override and user) keyed by
-  hierarchical name strings; components are not responsible for storing their own
-  verbosity level. `LOG_WARN`, `LOG_ERROR`, and `LOG_FATAL` are never suppressed by
-  verbosity.
+  `LOG_MEDIUM`. The logger owns one override table keyed by hierarchical name strings,
+  populated from plusargs at initialization and never modified after that. Components
+  are not responsible for storing their own verbosity level. `LOG_WARN`, `LOG_ERROR`,
+  and `LOG_FATAL` are never suppressed by verbosity.
 
 ```
 vrf_logger::get_inst().set_verbosity("root.env.uart_agent.driver", LOG_DEBUG);  // verbose for this component
